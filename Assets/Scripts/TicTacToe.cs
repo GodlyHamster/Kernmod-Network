@@ -1,4 +1,6 @@
+using System;
 using System.Collections.Generic;
+using Unity.Networking.Transport;
 using UnityEngine;
 
 public class TicTacToe : MonoBehaviour
@@ -15,10 +17,24 @@ public class TicTacToe : MonoBehaviour
     public Vector2Int movePos;
     public Shape shape;
 
+    private Shape assignedShape;
+
     [ContextMenu("Do Move")]
     public void DebugMove()
     {
         PlacePiece(movePos, shape);
+    }
+
+    private void OnEnable()
+    {
+        NetworkUtility.S_PlayerJoined += OnPlayerJoinServer;
+        NetworkUtility.C_PlayerJoined += OnPlayerJoinClient;
+    }
+
+    private void OnDisable()
+    {
+        NetworkUtility.S_PlayerJoined -= OnPlayerJoinServer;
+        NetworkUtility.C_PlayerJoined -= OnPlayerJoinClient;
     }
 
     private void Awake()
@@ -84,6 +100,21 @@ public class TicTacToe : MonoBehaviour
         }
     }
 
+    private void OnPlayerJoinServer(NetworkMessage message, NetworkConnection connection)
+    {
+        PlayerJoinedMessage newMessage = message as PlayerJoinedMessage;
+
+        newMessage.assignedShape = (Shape)ServerBehaviour.instance.PlayerCount;
+
+        ServerBehaviour.instance.SendToClient(connection, newMessage);
+    }
+    private void OnPlayerJoinClient(NetworkMessage message)
+    {
+        PlayerJoinedMessage newMessage = message as PlayerJoinedMessage;
+
+        assignedShape = newMessage.assignedShape;
+    }
+
     private void OnDrawGizmos()
     {
         if (!doDebug) return;
@@ -103,7 +134,7 @@ public class TicTacToe : MonoBehaviour
 
 public enum Shape
 {
-    EMPTY,
-    CROSS,
-    CRICLE
+    EMPTY = 0,
+    CROSS = 1,
+    CRICLE = 2
 }

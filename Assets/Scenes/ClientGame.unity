@@ -356,7 +356,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9ed3039fbfae24e42b851c419f65ad40, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  playerID: 0
 --- !u!4 &339259567
 Transform:
   m_ObjectHideFlags: 0
@@ -381,10 +380,9 @@ MonoBehaviour:
   m_GameObject: {fileID: 339259565}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: bcd020724ebb2de46b20a9704e27f1d6, type: 3}
+  m_Script: {fileID: 11500000, guid: 6338cc698545679449ce68bf683aac56, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  client: {fileID: 339259566}
 --- !u!1 &410087039
 GameObject:
   m_ObjectHideFlags: 0
@@ -822,6 +820,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   playerPrefab: {fileID: 5796346897207767259, guid: f03c1062433aa634aa05772a3d6da03e, type: 3}
+  spawnCount: 0
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

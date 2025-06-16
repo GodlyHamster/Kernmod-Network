@@ -1,9 +1,25 @@
 using Unity.Collections;
 using Unity.Networking.Transport;
-using UnityEngine;
 
-public abstract class NetworkMessage
+public class NetworkMessage
 {
-    public abstract void Encode(ref DataStreamWriter writer);
-    public abstract void Decode(ref DataStreamReader reader);
+    public MessageTypes MessageType { set; get; }
+
+    public virtual void Serialize(ref DataStreamWriter writer)
+    {
+        writer.WriteMessageType(MessageType);
+    }
+    public virtual void Deserialize(DataStreamReader reader)
+    {
+
+    }
+
+    public virtual void ReceivedOnClient()
+    {
+
+    }
+    public virtual void ReceivedOnServer(NetworkConnection client) 
+    {
+
+    }
 }

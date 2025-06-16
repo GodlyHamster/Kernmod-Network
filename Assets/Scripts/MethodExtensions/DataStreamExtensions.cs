@@ -3,11 +3,11 @@ using UnityEngine;
 
 public static class DataStreamExtensions
 {
-    public static void WriteMessageID(this ref DataStreamWriter writer, MessageTypes message)
+    public static void WriteMessageType(this ref DataStreamWriter writer, MessageTypes message)
     {
         writer.WriteUInt((uint)message);
     }
-    public static MessageTypes ReadMessageID(this ref DataStreamReader reader)
+    public static MessageTypes ReadMessageType(this ref DataStreamReader reader)
     {
         return (MessageTypes)reader.ReadUInt();
     }

@@ -15,9 +15,7 @@ public class Player : MonoBehaviour
     {
         if (Input.GetKeyDown(KeyCode.Space))
         {
-            DataStreamWriter writer = client.StartSend();
-            PacketHandler.SendBoardMove(ref writer, new Vector2Int(0, 0), assignedShape);
-            client.EndSend();
+            //send random move
         }
     }
 }

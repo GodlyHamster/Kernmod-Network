@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using Unity.Collections;
 using Unity.Networking.Transport;
@@ -6,79 +7,110 @@ using UnityEngine;
 public class ClientBehaviour : MonoBehaviour
 {
     public static ClientBehaviour instance;
-
-    public NetworkDriver networkDriver;
-    public NetworkConnection connection;
-
-    public int playerID;
-
-    private DataStreamWriter writer;
-    public delegate void Packet(ref DataStreamReader reader);
-    private Dictionary<MessageTypes, Packet> messages = new Dictionary<MessageTypes, Packet>()
-    {
-        {MessageTypes.PlayerJoined, PacketHandler.ReceiveJoinedMessasge },
-        {MessageTypes.BoardMove, PacketHandler.ReceiveBoardMove },
-    };
-
     private void Awake()
     {
         instance = this;
     }
 
-    void Start()
+    public NetworkDriver networkDriver;
+    public NetworkConnection connection;
+
+    private bool isActive = false;
+
+    private Action OnConnectionDropped;
+
+
+    public void Init(string ip, ushort port)
     {
         networkDriver = NetworkDriver.Create();
         connection = default(NetworkConnection);
 
-        var endPoint = NetworkEndpoint.LoopbackIpv4;
-        endPoint.Port = 9000;
+        var endPoint = NetworkEndpoint.Parse(ip, port);
+
         connection = networkDriver.Connect(endPoint);
+
+        isActive = true;
+
+        RegisterEvent();
     }
 
     void Update()
     {
+        if (!isActive) return;
+
         networkDriver.ScheduleUpdate().Complete();
 
-        if (!connection.IsCreated)
-        {
-            return;
-        }
+        CheckAlive();
+        UpdateMessagePump();
 
+    }
+
+    private void CheckAlive()
+    {
+        if (!connection.IsCreated && isActive)
+        {
+            Debug.Log("Lost connection to the server");
+            OnConnectionDropped.Invoke();
+            ShutDown();
+        }
+    }
+
+    private void UpdateMessagePump()
+    {
         DataStreamReader streamReader;
         NetworkEvent.Type cmd;
         while ((cmd = connection.PopEvent(networkDriver, out streamReader)) != NetworkEvent.Type.Empty)
         {
             if (cmd == NetworkEvent.Type.Connect)
             {
-                Debug.Log("Client is connected to the server");
+                Debug.Log("Connected to the server!");
+                SendToServer(new PlayerJoinedMessage());
             }
             else if (cmd == NetworkEvent.Type.Data)
             {
-                var receivedMessage = streamReader.ReadMessageID();
-                messages[receivedMessage]?.Invoke(ref streamReader);
-
-                Debug.Log($"Client{playerID} received {receivedMessage} message from server");
+                NetworkUtility.OnDataReceived(streamReader, connection);
             }
             else if (cmd == NetworkEvent.Type.Disconnect)
             {
-                Debug.Log("Client got disconnected from the server");
+                Debug.Log("Disconnected from the server");
                 connection = default(NetworkConnection);
+                OnConnectionDropped?.Invoke();
+                ShutDown();
             }
         }
     }
 
-    public DataStreamWriter StartSend()
+    public void SendToServer(NetworkMessage message)
     {
-        networkDriver.BeginSend(NetworkPipeline.Null, connection, out writer);
-        return writer;
-    }
-    public void EndSend()
-    {
+        networkDriver.BeginSend(connection, out DataStreamWriter writer);
+        message.Serialize(ref writer);
         networkDriver.EndSend(writer);
+    }
+
+    private void RegisterEvent()
+    {
+        NetworkUtility.C_KeepAlive += KeepAlive;
+    }
+    private void UnregisterEvent()
+    {
+        NetworkUtility.C_KeepAlive -= KeepAlive;
+    }
+    private void KeepAlive(NetworkMessage message)
+    {
+        SendToServer(message);
+    }
+
+    public void ShutDown()
+    {
+        Debug.Log("Client disconnected from network");
+        UnregisterEvent();
+        networkDriver.Dispose();
+        connection = default(NetworkConnection);
+        isActive = false;
     }
 
     private void OnDestroy()
     {
-        networkDriver.Dispose();
+        ShutDown();
     }
 }

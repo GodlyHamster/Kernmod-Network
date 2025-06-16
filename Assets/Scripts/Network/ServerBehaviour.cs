@@ -5,22 +5,27 @@ using System;
 
 public class ServerBehaviour : MonoBehaviour
 {
-    public NetworkDriver networkDriver;
-    private NativeList<NetworkConnection> connections;
-
-    public int playersInSession
+    public static ServerBehaviour instance;
+    private void Awake()
     {
-        get
-        {
-            return connections.Length;
-        }
+        instance = this;
     }
 
-    void Start()
+    public NetworkDriver networkDriver;
+    private NativeList<NetworkConnection> connections;
+    public int PlayerCount { get { return connections.Length; } }
+
+    private bool isActive = false;
+    private const float keepAliveTickrate = 20f;
+    private float lastKeepAlive;
+
+    public Action OnConnectionDropped;
+
+    public void Init(ushort port)
     {
         networkDriver = NetworkDriver.Create();
         var endPoint = NetworkEndpoint.AnyIpv4;
-        endPoint.Port = 9000;
+        endPoint.Port = port;
         if (networkDriver.Bind(endPoint) != 0)
         {
             Debug.Log($"Failed to bind to port {endPoint.Port}");
@@ -30,14 +35,24 @@ public class ServerBehaviour : MonoBehaviour
             networkDriver.Listen();
         }
 
-        connections = new NativeList<NetworkConnection>(16, Allocator.Persistent);
+        connections = new NativeList<NetworkConnection>(2, Allocator.Persistent);
+        isActive = true;
     }
 
     void Update()
     {
+        if (!isActive) return;
+
         networkDriver.ScheduleUpdate().Complete();
 
-        //Clean connections
+        CleanupConnections();
+        AcceptNewConnections();
+        UpdateMessagePump();
+    }
+
+
+    private void CleanupConnections()
+    {
         for (int i = connections.Length - 1; i >= 0; i--)
         {
             if (!connections[i].IsCreated)
@@ -45,21 +60,20 @@ public class ServerBehaviour : MonoBehaviour
                 connections.RemoveAtSwapBack(i);
             }
         }
+    }
 
-        //new connections
+    private void AcceptNewConnections()
+    {
         NetworkConnection c;
         while ((c = networkDriver.Accept()) != default(NetworkConnection))
         {
             connections.Add(c);
             Debug.Log("Accepted a new connection");
-
-            //Sends player their id
-            networkDriver.BeginSend(NetworkPipeline.Null, c, out DataStreamWriter writer);
-            int playerID = connections.IndexOf(c);
-            PacketHandler.Server.SendJoinedMessage(ref writer, playerID);
-            networkDriver.EndSend(writer);
         }
+    }
 
+    private void UpdateMessagePump()
+    {
         DataStreamReader streamReader;
         for (int i = 0; i < connections.Length; i++)
         {
@@ -70,42 +84,46 @@ public class ServerBehaviour : MonoBehaviour
             {
                 if (cmd == NetworkEvent.Type.Data)
                 {
-                    var receivedMessage = streamReader.ReadMessageID();
-                    Debug.Log($"Server received {receivedMessage} message from client {i}");
-                    SendMessageToAll(receivedMessage);
+                    NetworkUtility.OnDataReceived(streamReader, connections[i], this);
                 }
                 else if (cmd == NetworkEvent.Type.Disconnect)
                 {
                     Debug.Log("Client disconnected from server");
                     connections[i] = default(NetworkConnection);
+                    OnConnectionDropped?.Invoke();
+                    ShutDown();
                 }
             }
         }
     }
 
-    public void SendMessageToOne(MessageTypes message, int playerId)
+    public void SendToClient(NetworkConnection connection, NetworkMessage message)
     {
-        networkDriver.BeginSend(NetworkPipeline.Null, connections[playerId], out DataStreamWriter writer);
-        MessageHandler.HandleSendMessage(message, ref writer);
+        networkDriver.BeginSend(connection, out DataStreamWriter writer);
+        message.Serialize(ref writer);
         networkDriver.EndSend(writer);
     }
 
-    public void SendMessageToAll(MessageTypes message)
+    public void Broadcast(NetworkMessage message)
     {
         for (int i = 0; i < connections.Length; i++)
         {
-            networkDriver.BeginSend(NetworkPipeline.Null, connections[i], out DataStreamWriter writer);
-            MessageHandler.HandleSendMessage(message, ref writer);
-            networkDriver.EndSend(writer);
+            SendToClient(connections[i], message);
         }
     }
 
-    private void OnDestroy()
+    public void ShutDown()
     {
-        if (networkDriver.IsCreated)
+        if (isActive)
         {
+            Debug.Log("Server disconnected from network");
             networkDriver.Dispose();
             connections.Dispose();
+            isActive = false;
         }
+    }
+    private void OnDestroy()
+    {
+        ShutDown();
     }
 }
