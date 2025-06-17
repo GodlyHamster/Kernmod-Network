@@ -1,5 +1,8 @@
+using System;
 using TMPro;
+using Unity.Networking.Transport;
 using UnityEngine;
+using System.Collections.Generic;
 
 public class LobbyMenuManager : MonoBehaviour
 {
@@ -11,9 +14,11 @@ public class LobbyMenuManager : MonoBehaviour
 
     [Header("Menus")]
     [SerializeField]
-    private GameObject HostJoinMenu;
+    private GameObject HostJoinScreen;
     [SerializeField]
-    private GameObject LobbyMenu;
+    private GameObject LobbyScreen;
+    [SerializeField]
+    private GameObject ConnectingScreen;
 
     [Header("Networking")]
     [SerializeField]
@@ -24,41 +29,65 @@ public class LobbyMenuManager : MonoBehaviour
     [SerializeField]
     private TMP_InputField ipInput;
 
+    private void OnEnable()
+    {
+        NetworkUtility.S_PlayerJoined += OnConnectedServer;
+        NetworkUtility.C_PlayerJoined += OnConnectedClient;
+        client.OnConnectionDropped += QuitLobby;
+    }
+
+    private void OnDisable()
+    {
+        NetworkUtility.S_PlayerJoined -= OnConnectedServer;
+        NetworkUtility.C_PlayerJoined -= OnConnectedClient;
+        client.OnConnectionDropped -= QuitLobby;
+    }
+
     private void Start()
     {
         SetMenuState(HostingMenuState.HostJoin);
+    }
+
+    private void OnConnectedServer(NetworkMessage message, NetworkConnection connection)
+    {
+        server.SendToClient(connection, message);
+    }
+
+    private void OnConnectedClient(NetworkMessage message)
+    {
+        SetMenuState(HostingMenuState.Lobby);
     }
 
     public void HostLocalGame()
     {
         server.Init(9000);
         client.Init("127.0.0.1", 9000);
-        SetMenuState(HostingMenuState.Lobby);
+        SetMenuState(HostingMenuState.Connecting);
     }
 
     public void JoinLocalGame()
     {
         client.Init("127.0.0.1", 9000);
-        SetMenuState(HostingMenuState.Lobby);
+        SetMenuState(HostingMenuState.Connecting);
     }
 
     public void HostOnlineGame()
     {
         server.Init(9000);
         client.Init("127.0.0.1", 9000);
-        SetMenuState(HostingMenuState.Lobby);
+        SetMenuState(HostingMenuState.Connecting);
     }
 
     public void JoinOnlineGame()
     {
         client.Init(ipInput.text, 9000);
-        SetMenuState(HostingMenuState.Lobby);
+        SetMenuState(HostingMenuState.Connecting);
     }
 
     public void CancelConnection()
     {
-        server.ShutDown();
         client.ShutDown();
+        server.ShutDown();
     }
 
     public void QuitLobby()
@@ -72,16 +101,24 @@ public class LobbyMenuManager : MonoBehaviour
         switch (menuState)
         {
             case HostingMenuState.HostJoin:
-                HostJoinMenu.SetActive(true);
-                LobbyMenu.SetActive(false);
+                HostJoinScreen.SetActive(true);
+                LobbyScreen.SetActive(false);
+                ConnectingScreen.SetActive(false);
                 break;
             case HostingMenuState.Lobby:
-                HostJoinMenu.SetActive(false);
-                LobbyMenu.SetActive(true);
+                HostJoinScreen.SetActive(false);
+                LobbyScreen.SetActive(true);
+                ConnectingScreen.SetActive(false);
+                break;
+            case HostingMenuState.Connecting:
+                HostJoinScreen.SetActive(false);
+                LobbyScreen.SetActive(false);
+                ConnectingScreen.SetActive(true);
                 break;
             default:
-                HostJoinMenu.SetActive(true);
-                LobbyMenu.SetActive(false);
+                HostJoinScreen.SetActive(true);
+                LobbyScreen.SetActive(false);
+                ConnectingScreen.SetActive(false);
                 break;
         }
     }
@@ -90,5 +127,6 @@ public class LobbyMenuManager : MonoBehaviour
 public enum HostingMenuState
 {
     HostJoin,
-    Lobby
+    Lobby,
+    Connecting
 }

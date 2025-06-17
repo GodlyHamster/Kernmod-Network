@@ -43,6 +43,8 @@ public class ServerBehaviour : MonoBehaviour
     {
         if (!isActive) return;
 
+        KeepAlive();
+
         networkDriver.ScheduleUpdate().Complete();
 
         CleanupConnections();
@@ -50,6 +52,14 @@ public class ServerBehaviour : MonoBehaviour
         UpdateMessagePump();
     }
 
+    private void KeepAlive()
+    {
+        if (Time.time - lastKeepAlive > keepAliveTickrate)
+        {
+            lastKeepAlive = Time.time;
+            Broadcast(new KeepAliveMessage());
+        }
+    }
 
     private void CleanupConnections()
     {
@@ -77,8 +87,6 @@ public class ServerBehaviour : MonoBehaviour
         DataStreamReader streamReader;
         for (int i = 0; i < connections.Length; i++)
         {
-            if (!connections[i].IsCreated) continue;
-
             NetworkEvent.Type cmd;
             while ((cmd = networkDriver.PopEventForConnection(connections[i], out streamReader)) != NetworkEvent.Type.Empty)
             {
@@ -108,7 +116,10 @@ public class ServerBehaviour : MonoBehaviour
     {
         for (int i = 0; i < connections.Length; i++)
         {
-            SendToClient(connections[i], message);
+            if (connections[i].IsCreated)
+            {
+                SendToClient(connections[i], message);
+            }
         }
     }
 

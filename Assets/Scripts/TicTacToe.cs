@@ -102,17 +102,17 @@ public class TicTacToe : MonoBehaviour
 
     private void OnPlayerJoinServer(NetworkMessage message, NetworkConnection connection)
     {
-        PlayerJoinedMessage newMessage = message as PlayerJoinedMessage;
+        //PlayerJoinedMessage newMessage = message as PlayerJoinedMessage;
 
-        newMessage.assignedShape = (Shape)ServerBehaviour.instance.PlayerCount;
+        //newMessage.assignedShape = (Shape)ServerBehaviour.instance.PlayerCount;
 
-        ServerBehaviour.instance.SendToClient(connection, newMessage);
+        //ServerBehaviour.instance.SendToClient(connection, newMessage);
     }
     private void OnPlayerJoinClient(NetworkMessage message)
     {
-        PlayerJoinedMessage newMessage = message as PlayerJoinedMessage;
+        //PlayerJoinedMessage newMessage = message as PlayerJoinedMessage;
 
-        assignedShape = newMessage.assignedShape;
+        //assignedShape = newMessage.assignedShape;
     }
 
     private void OnDrawGizmos()

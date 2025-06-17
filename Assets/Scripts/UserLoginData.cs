@@ -17,5 +17,5 @@ public class UserData
 {
     public string id;
     public string email;
-    public string nickname;
+    public string nickname = "UnnamedPlayer";
 }

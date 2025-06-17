@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using Unity.Collections;
 using Unity.Networking.Transport;
 using UnityEngine;
@@ -17,13 +16,12 @@ public class ClientBehaviour : MonoBehaviour
 
     private bool isActive = false;
 
-    private Action OnConnectionDropped;
+    public Action OnConnectionDropped;
 
 
     public void Init(string ip, ushort port)
     {
         networkDriver = NetworkDriver.Create();
-        connection = default(NetworkConnection);
 
         var endPoint = NetworkEndpoint.Parse(ip, port);
 
@@ -42,7 +40,6 @@ public class ClientBehaviour : MonoBehaviour
 
         CheckAlive();
         UpdateMessagePump();
-
     }
 
     private void CheckAlive()
@@ -50,7 +47,7 @@ public class ClientBehaviour : MonoBehaviour
         if (!connection.IsCreated && isActive)
         {
             Debug.Log("Lost connection to the server");
-            OnConnectionDropped.Invoke();
+            OnConnectionDropped?.Invoke();
             ShutDown();
         }
     }
@@ -102,11 +99,14 @@ public class ClientBehaviour : MonoBehaviour
 
     public void ShutDown()
     {
-        Debug.Log("Client disconnected from network");
-        UnregisterEvent();
-        networkDriver.Dispose();
-        connection = default(NetworkConnection);
-        isActive = false;
+        if (isActive)
+        {
+            Debug.Log("Client disconnected from network");
+            UnregisterEvent();
+            networkDriver.Dispose();
+            connection = default(NetworkConnection);
+            isActive = false;
+        }
     }
 
     private void OnDestroy()
