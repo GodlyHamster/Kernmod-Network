@@ -3,6 +3,7 @@ using TMPro;
 using Unity.Networking.Transport;
 using UnityEngine;
 using System.Collections.Generic;
+using UnityEngine.SceneManagement;
 
 public class LobbyMenuManager : MonoBehaviour
 {
@@ -12,6 +13,9 @@ public class LobbyMenuManager : MonoBehaviour
         instance = this;
     }
 
+    [SerializeField]
+    private string GameScene;
+
     [Header("Menus")]
     [SerializeField]
     private GameObject HostJoinScreen;
@@ -20,27 +24,24 @@ public class LobbyMenuManager : MonoBehaviour
     [SerializeField]
     private GameObject ConnectingScreen;
 
-    [Header("Networking")]
-    [SerializeField]
-    private ServerBehaviour server;
-    [SerializeField]
-    private ClientBehaviour client;
-
     [SerializeField]
     private TMP_InputField ipInput;
+
+    private int currentPlayers = 0;
 
     private void OnEnable()
     {
         NetworkUtility.S_PlayerJoined += OnConnectedServer;
         NetworkUtility.C_PlayerJoined += OnConnectedClient;
-        client.OnConnectionDropped += QuitLobby;
+        NetworkUtility.C_StartGame += OnStartGameClient;
+        ClientBehaviour.instance.OnConnectionDropped += QuitLobby;
     }
 
     private void OnDisable()
     {
         NetworkUtility.S_PlayerJoined -= OnConnectedServer;
         NetworkUtility.C_PlayerJoined -= OnConnectedClient;
-        client.OnConnectionDropped -= QuitLobby;
+        ClientBehaviour.instance.OnConnectionDropped -= QuitLobby;
     }
 
     private void Start()
@@ -50,7 +51,19 @@ public class LobbyMenuManager : MonoBehaviour
 
     private void OnConnectedServer(NetworkMessage message, NetworkConnection connection)
     {
-        server.SendToClient(connection, message);
+
+        PlayerJoinedMessage newMessage = message as PlayerJoinedMessage;
+
+        currentPlayers++;
+        newMessage.assignedShape = (Shape)currentPlayers;
+
+        ServerBehaviour.instance.SendToClient(connection, message);
+
+        //start when lobby is full
+        if (currentPlayers == 2)
+        {
+            ServerBehaviour.instance.Broadcast(new StartGameMessage());
+        }
     }
 
     private void OnConnectedClient(NetworkMessage message)
@@ -58,36 +71,41 @@ public class LobbyMenuManager : MonoBehaviour
         SetMenuState(HostingMenuState.Lobby);
     }
 
+    private void OnStartGameClient(NetworkMessage message)
+    {
+        SceneManager.LoadScene(GameScene);
+    }
+
     public void HostLocalGame()
     {
-        server.Init(9000);
-        client.Init("127.0.0.1", 9000);
+        ServerBehaviour.instance.Init(9000);
+        ClientBehaviour.instance.Init("127.0.0.1", 9000);
         SetMenuState(HostingMenuState.Connecting);
     }
 
     public void JoinLocalGame()
     {
-        client.Init("127.0.0.1", 9000);
+        ClientBehaviour.instance.Init("127.0.0.1", 9000);
         SetMenuState(HostingMenuState.Connecting);
     }
 
     public void HostOnlineGame()
     {
-        server.Init(9000);
-        client.Init("127.0.0.1", 9000);
+        ServerBehaviour.instance.Init(9000);
+        ClientBehaviour.instance.Init("127.0.0.1", 9000);
         SetMenuState(HostingMenuState.Connecting);
     }
 
     public void JoinOnlineGame()
     {
-        client.Init(ipInput.text, 9000);
+        ClientBehaviour.instance.Init(ipInput.text, 9000);
         SetMenuState(HostingMenuState.Connecting);
     }
 
     public void CancelConnection()
     {
-        client.ShutDown();
-        server.ShutDown();
+        ClientBehaviour.instance.ShutDown();
+        ServerBehaviour.instance.ShutDown();
     }
 
     public void QuitLobby()

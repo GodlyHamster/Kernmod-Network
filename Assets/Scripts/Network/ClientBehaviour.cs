@@ -9,6 +9,7 @@ public class ClientBehaviour : MonoBehaviour
     private void Awake()
     {
         instance = this;
+        DontDestroyOnLoad(gameObject);
     }
 
     public NetworkDriver networkDriver;
@@ -47,7 +48,6 @@ public class ClientBehaviour : MonoBehaviour
         if (!connection.IsCreated && isActive)
         {
             Debug.Log("Lost connection to the server");
-            OnConnectionDropped?.Invoke();
             ShutDown();
         }
     }
@@ -56,6 +56,7 @@ public class ClientBehaviour : MonoBehaviour
     {
         DataStreamReader streamReader;
         NetworkEvent.Type cmd;
+
         while ((cmd = connection.PopEvent(networkDriver, out streamReader)) != NetworkEvent.Type.Empty)
         {
             if (cmd == NetworkEvent.Type.Connect)
@@ -71,7 +72,6 @@ public class ClientBehaviour : MonoBehaviour
             {
                 Debug.Log("Disconnected from the server");
                 connection = default(NetworkConnection);
-                OnConnectionDropped?.Invoke();
                 ShutDown();
             }
         }
@@ -102,6 +102,7 @@ public class ClientBehaviour : MonoBehaviour
         if (isActive)
         {
             Debug.Log("Client disconnected from network");
+            OnConnectionDropped?.Invoke();
             UnregisterEvent();
             networkDriver.Dispose();
             connection = default(NetworkConnection);

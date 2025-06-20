@@ -98,7 +98,6 @@ public class ServerBehaviour : MonoBehaviour
                 {
                     Debug.Log("Client disconnected from server");
                     connections[i] = default(NetworkConnection);
-                    OnConnectionDropped?.Invoke();
                     ShutDown();
                 }
             }
@@ -128,6 +127,7 @@ public class ServerBehaviour : MonoBehaviour
         if (isActive)
         {
             Debug.Log("Server disconnected from network");
+            OnConnectionDropped?.Invoke();
             networkDriver.Dispose();
             connections.Dispose();
             isActive = false;

@@ -14,6 +14,8 @@ public static class NetworkUtility
             case MessageTypes.KeepAlive: message = new KeepAliveMessage(reader); break;
             case MessageTypes.PlayerJoined: message = new PlayerJoinedMessage(reader); break;
             case MessageTypes.StartGame: message = new StartGameMessage(reader); break;
+            case MessageTypes.BoardMove: message = new BoardMoveMessage(reader); break;
+            case MessageTypes.GameEnd: message = new EndGameMessage(reader); break;
             default:
             Debug.LogError("Message received had not type");
             break;

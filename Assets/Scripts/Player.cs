@@ -1,21 +1,32 @@
+using System;
 using Unity.Collections;
 using UnityEngine;
 
 public class Player : MonoBehaviour
 {
-    [SerializeField]
-    private ClientBehaviour client;
+    public static Player instance;
 
-    [SerializeField]
-    private Shape assignedShape;
+    public Shape assignedShape = Shape.EMPTY;
 
-    private int objectId;
-
-    void Update()
+    private void Awake()
     {
-        if (Input.GetKeyDown(KeyCode.Space))
-        {
-            //send random move
-        }
+        instance = this;
+    }
+
+    private void OnEnable()
+    {
+        NetworkUtility.C_PlayerJoined += OnJoined;
+    }
+
+    private void OnDisable()
+    {
+        NetworkUtility.C_PlayerJoined -= OnJoined;
+    }
+
+    private void OnJoined(NetworkMessage message)
+    {
+        PlayerJoinedMessage newMessage = message as PlayerJoinedMessage;
+
+        assignedShape = newMessage.assignedShape;
     }
 }

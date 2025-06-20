@@ -1,40 +1,49 @@
 using System;
 using System.Collections.Generic;
+using TMPro;
 using Unity.Networking.Transport;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 public class TicTacToe : MonoBehaviour
 {
     public static TicTacToe instance;
 
+    [Header("Game")]
     [SerializeField]
     private int boardSize = 3;
+    public Sprite crossSprite;
+    public Sprite circleSprite;
+
+    [Header("Endscreen")]
+    [SerializeField]
+    private GameObject endScreenContainer;
+    [SerializeField]
+    private TextMeshProUGUI endText;
 
     private Shape[,] board;
 
-    [Header("Debugging")]
-    public bool doDebug = false;
-    public Vector2Int movePos;
-    public Shape shape;
+    private Shape currentTurn = Shape.CROSS;
 
-    private Shape assignedShape;
-
-    [ContextMenu("Do Move")]
-    public void DebugMove()
-    {
-        PlacePiece(movePos, shape);
-    }
+    private bool gameEnded = false;
 
     private void OnEnable()
     {
-        NetworkUtility.S_PlayerJoined += OnPlayerJoinServer;
-        NetworkUtility.C_PlayerJoined += OnPlayerJoinClient;
+        NetworkUtility.S_BoardMove += OnBoardMoveServer;
+        NetworkUtility.S_EndGame += OnGameEndedServer;
+
+        NetworkUtility.C_BoardMove += OnBoardMoveClient;
+        NetworkUtility.C_EndGame += OnGameEndedClient;
     }
+
 
     private void OnDisable()
     {
-        NetworkUtility.S_PlayerJoined -= OnPlayerJoinServer;
-        NetworkUtility.C_PlayerJoined -= OnPlayerJoinClient;
+        NetworkUtility.S_BoardMove -= OnBoardMoveServer;
+        NetworkUtility.S_EndGame -= OnGameEndedServer;
+
+        NetworkUtility.C_BoardMove += OnBoardMoveClient;
+        NetworkUtility.C_EndGame -= OnGameEndedClient;
     }
 
     private void Awake()
@@ -44,6 +53,7 @@ public class TicTacToe : MonoBehaviour
 
     private void Start()
     {
+        endScreenContainer.SetActive(false);
         InitializeBoard();
     }
 
@@ -52,14 +62,32 @@ public class TicTacToe : MonoBehaviour
         board = new Shape[boardSize, boardSize];
     }
 
-    public void PlacePiece(Vector2Int pos, Shape shape)
+    private void OnBoardMoveServer(NetworkMessage message, NetworkConnection connection)
     {
-        if (shape == Shape.EMPTY) return;
+        BoardMoveMessage boardMove = message as BoardMoveMessage;
+
+        if (currentTurn != boardMove.shape) return;
+
+        ServerBehaviour.instance.Broadcast(message);
+    }
+    private void OnBoardMoveClient(NetworkMessage message)
+    {
+        BoardMoveMessage boardMove = message as BoardMoveMessage;
+
+        PlacePiece(boardMove.movePos, boardMove.shape);
+    }
+
+    public bool PlacePiece(Vector2Int pos, Shape shape)
+    {
+        if (gameEnded) return false;
+        if (currentTurn != shape) return false;
+        if (shape == Shape.EMPTY) return false;
 
         //place shape
         if (board[pos.x, pos.y] == Shape.EMPTY)
         {
             board[pos.x, pos.y] = shape;
+            currentTurn = shape == Shape.CROSS ? Shape.CRICLE : Shape.CROSS;
         }
 
         //check row win
@@ -68,7 +96,7 @@ public class TicTacToe : MonoBehaviour
             if (board[i, pos.y] != shape) break;
             if (i == boardSize - 1)
             {
-                Debug.Log($"{shape} won!!");
+                SendWinMessage(shape);
             }
         }
         //check col win
@@ -77,7 +105,7 @@ public class TicTacToe : MonoBehaviour
             if (board[pos.x, i] != shape) break;
             if (i == boardSize - 1)
             {
-                Debug.Log($"{shape} won!!");
+                SendWinMessage(shape);
             }
         }
         //check diagonal
@@ -86,7 +114,7 @@ public class TicTacToe : MonoBehaviour
             if (board[i, i] != shape) break;
             if (i == boardSize - 1)
             {
-                Debug.Log($"{shape} won!!");
+                SendWinMessage(shape);
             }
         }
         //check inverted diagonal
@@ -95,29 +123,44 @@ public class TicTacToe : MonoBehaviour
             if (board[boardSize-1 - i, i] != shape) break;
             if (i == boardSize - 1)
             {
-                Debug.Log($"{shape} won!!");
+                SendWinMessage(shape);
             }
         }
+        return true;
     }
 
-    private void OnPlayerJoinServer(NetworkMessage message, NetworkConnection connection)
+    private void SendWinMessage(Shape winningShape)
     {
-        //PlayerJoinedMessage newMessage = message as PlayerJoinedMessage;
-
-        //newMessage.assignedShape = (Shape)ServerBehaviour.instance.PlayerCount;
-
-        //ServerBehaviour.instance.SendToClient(connection, newMessage);
+        gameEnded = true;
+        ClientBehaviour.instance.SendToServer(new EndGameMessage() { winningShape = winningShape });
     }
-    private void OnPlayerJoinClient(NetworkMessage message)
+    private void OnGameEndedServer(NetworkMessage message, NetworkConnection connection)
     {
-        //PlayerJoinedMessage newMessage = message as PlayerJoinedMessage;
+        //broadcast game ending to all players
+        ServerBehaviour.instance.Broadcast(message);
+    }
+    private void OnGameEndedClient(NetworkMessage message)
+    {
+        EndGameMessage msg = message as EndGameMessage;
+        bool didWin = msg.winningShape == Player.instance.assignedShape;
 
-        //assignedShape = newMessage.assignedShape;
+        //upload score and enable end screen
+        int score = didWin ? 1 : 0;
+        APIManager.instance.UploadScore(score);
+
+        endText.text = didWin ? "You Won!!" : "You lost :(";
+        endScreenContainer.SetActive(true);
+    }
+
+    public void ReturnToMenu()
+    {
+        ClientBehaviour.instance.ShutDown();
+        ServerBehaviour.instance.ShutDown();
+        SceneManager.LoadScene("MainMenu");
     }
 
     private void OnDrawGizmos()
     {
-        if (!doDebug) return;
         if (board == null) return;
 
         Color[] colors = new Color[] { Color.black, Color.red, Color.blue };
